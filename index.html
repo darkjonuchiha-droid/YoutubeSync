@@ -1,0 +1,313 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Pause, Users, Link, Copy, Check } from 'lucide-react';
+
+export default function WatchTogether() {
+  const [roomId, setRoomId] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoId, setVideoId] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isHost, setIsHost] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const playerRef = useRef(null);
+  const syncIntervalRef = useRef(null);
+
+  // Extract YouTube video ID from URL
+  const extractVideoId = (url) => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+      /youtube\.com\/embed\/([^&\n?#]+)/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  // Initialize room
+  const createRoom = () => {
+    const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setRoomId(newRoomId);
+    setIsHost(true);
+    initializeStorage(newRoomId, true);
+  };
+
+  const joinRoom = (id) => {
+    setRoomId(id);
+    setIsHost(false);
+    loadRoomState(id);
+  };
+
+  // Storage functions
+  const initializeStorage = async (roomId, asHost) => {
+    try {
+      const roomData = {
+        videoId: '',
+        isPlaying: false,
+        currentTime: 0,
+        lastUpdate: Date.now()
+      };
+      await window.storage.set(`room_${roomId}`, JSON.stringify(roomData), true);
+    } catch (error) {
+      console.error('Storage error:', error);
+    }
+  };
+
+  const loadRoomState = async (roomId) => {
+    try {
+      const result = await window.storage.get(`room_${roomId}`, true);
+      if (result) {
+        const data = JSON.parse(result.value);
+        if (data.videoId) {
+          setVideoId(data.videoId);
+          setIsPlaying(data.isPlaying);
+          setCurrentTime(data.currentTime);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading room:', error);
+    }
+  };
+
+  const updateRoomState = async (updates) => {
+    if (!roomId) return;
+    
+    try {
+      const result = await window.storage.get(`room_${roomId}`, true);
+      const currentData = result ? JSON.parse(result.value) : {};
+      
+      const newData = {
+        ...currentData,
+        ...updates,
+        lastUpdate: Date.now()
+      };
+      
+      await window.storage.set(`room_${roomId}`, JSON.stringify(newData), true);
+    } catch (error) {
+      console.error('Error updating room:', error);
+    }
+  };
+
+  // Load video
+  const loadVideo = () => {
+    const id = extractVideoId(videoUrl);
+    if (id) {
+      setVideoId(id);
+      if (isHost) {
+        updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
+      }
+    }
+  };
+
+  // Sync state with other viewers
+  useEffect(() => {
+    if (!roomId || !videoId) return;
+
+    const syncState = async () => {
+      try {
+        const result = await window.storage.get(`room_${roomId}`, true);
+        if (result) {
+          const data = JSON.parse(result.value);
+          
+          // Only sync if we're not the one who made the last update
+          if (!isHost || data.lastUpdate > Date.now() - 500) {
+            if (data.videoId !== videoId) {
+              setVideoId(data.videoId);
+            }
+            if (Math.abs(data.currentTime - currentTime) > 2) {
+              setCurrentTime(data.currentTime);
+            }
+            if (data.isPlaying !== isPlaying) {
+              setIsPlaying(data.isPlaying);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Sync error:', error);
+      }
+    };
+
+    syncIntervalRef.current = setInterval(syncState, 1000);
+    return () => clearInterval(syncIntervalRef.current);
+  }, [roomId, videoId, isHost]);
+
+  // Handle play/pause
+  const togglePlayback = () => {
+    const newState = !isPlaying;
+    setIsPlaying(newState);
+    if (isHost) {
+      updateRoomState({ isPlaying: newState, currentTime });
+    }
+  };
+
+  // Update time periodically
+  useEffect(() => {
+    if (!isPlaying) return;
+    
+    const interval = setInterval(() => {
+      setCurrentTime(t => {
+        const newTime = t + 1;
+        if (isHost) {
+          updateRoomState({ currentTime: newTime });
+        }
+        return newTime;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isPlaying, isHost]);
+
+  const copyRoomLink = () => {
+    navigator.clipboard.writeText(roomId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (!roomId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center p-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-white/20 shadow-2xl">
+          <div className="flex items-center justify-center mb-6">
+            <Users className="w-12 h-12 text-purple-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white text-center mb-2">Watch Together</h1>
+          <p className="text-purple-200 text-center mb-8">Watch YouTube videos in sync with friends</p>
+          
+          <div className="space-y-4">
+            <button
+              onClick={createRoom}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-105 shadow-lg"
+            >
+              Create New Room
+            </button>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/20"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-transparent text-purple-200">or</span>
+              </div>
+            </div>
+            
+            <input
+              type="text"
+              placeholder="Enter Room ID"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && e.target.value) {
+                  joinRoom(e.target.value.toUpperCase());
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 mb-4 border border-white/20">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <Users className="w-6 h-6 text-purple-400" />
+              <div>
+                <div className="text-white font-semibold">Room ID: {roomId}</div>
+                <div className="text-purple-300 text-sm">{isHost ? 'Host' : 'Viewer'}</div>
+              </div>
+            </div>
+            <button
+              onClick={copyRoomLink}
+              className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-all"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copied!' : 'Copy Room ID'}
+            </button>
+          </div>
+        </div>
+
+        {/* Video Input */}
+        {isHost && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 mb-4 border border-white/20">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste YouTube URL here..."
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                onClick={loadVideo}
+                className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg transition-all font-semibold"
+              >
+                Load Video
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Video Player */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl overflow-hidden border border-white/20 shadow-2xl">
+          {videoId ? (
+            <div className="aspect-video bg-black">
+              <iframe
+                ref={playerRef}
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(currentTime)}&autoplay=${isPlaying ? 1 : 0}`}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
+            </div>
+          ) : (
+            <div className="aspect-video bg-black/50 flex items-center justify-center">
+              <div className="text-center text-purple-300">
+                <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">
+                  {isHost ? 'Paste a YouTube URL above to get started' : 'Waiting for host to load a video...'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          {videoId && isHost && (
+            <div className="p-4 bg-black/30">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={togglePlayback}
+                  className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full transition-all"
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                </button>
+                <div className="text-white font-mono">
+                  {formatTime(currentTime)}
+                </div>
+                <div className="flex-1 text-purple-300 text-sm">
+                  {isPlaying ? 'Playing' : 'Paused'}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 text-center text-purple-300 text-sm">
+          Share the Room ID with friends to watch together!
+        </div>
+      </div>
+    </div>
+  );
+}
