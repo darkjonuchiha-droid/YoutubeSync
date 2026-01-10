@@ -7,10 +7,64 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
         .search-result:hover { background: rgba(102, 126, 234, 0.1); }
+        .volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100px;
+            height: 4px;
+            background: #e2e8f0;
+            outline: none;
+            border-radius: 2px;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #667eea;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #667eea;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+        .progress-bar {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            outline: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .progress-bar::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -19,7 +73,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // Lucide React Icons (simplified inline versions)
+        // Lucide React Icons
         const Users = ({ style }) => (
             <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -63,7 +117,26 @@
             </svg>
         );
 
-        // Mock storage API for standalone HTML (uses localStorage)
+        const Volume2 = ({ style }) => (
+            <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            </svg>
+        );
+
+        const VolumeX = ({ style }) => (
+            <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+            </svg>
+        );
+
+        const Maximize = ({ style }) => (
+            <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+        );
+
+        // Mock storage API
         window.storage = {
             async get(key, shared) {
                 const value = localStorage.getItem(key);
@@ -89,15 +162,20 @@
             const [videoId, setVideoId] = useState('');
             const [isPlaying, setIsPlaying] = useState(false);
             const [currentTime, setCurrentTime] = useState(0);
+            const [duration, setDuration] = useState(0);
+            const [volume, setVolume] = useState(100);
+            const [isMuted, setIsMuted] = useState(false);
             const [isHost, setIsHost] = useState(false);
             const [copied, setCopied] = useState(false);
             const [joinInput, setJoinInput] = useState('');
             const [searchQuery, setSearchQuery] = useState('');
             const [searchResults, setSearchResults] = useState([]);
             const [isSearching, setIsSearching] = useState(false);
-            const [inputMode, setInputMode] = useState('search'); // 'search' or 'url'
+            const [inputMode, setInputMode] = useState('search');
             const playerRef = useRef(null);
             const syncIntervalRef = useRef(null);
+            const playerInstanceRef = useRef(null);
+            const isSeekingRef = useRef(false);
 
             const extractVideoId = (url) => {
                 const patterns = [
@@ -206,30 +284,100 @@
 
             const selectVideo = (video) => {
                 const id = video.id.videoId;
-                setVideoId(id);
-                setCurrentTime(0);
-                setIsPlaying(false);
+                loadVideoById(id);
                 setSearchResults([]);
                 setSearchQuery('');
-                if (isHost) {
-                    updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
-                }
             };
 
             const loadVideo = () => {
                 const id = extractVideoId(videoUrl);
                 if (id) {
-                    setVideoId(id);
-                    setCurrentTime(0);
-                    setIsPlaying(false);
-                    if (isHost) {
-                        updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
-                    }
+                    loadVideoById(id);
                 }
             };
 
+            const loadVideoById = (id) => {
+                setVideoId(id);
+                setCurrentTime(0);
+                setIsPlaying(false);
+                if (isHost) {
+                    updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
+                }
+            };
+
+            // Initialize YouTube Player
             useEffect(() => {
-                if (!roomId || !videoId) return;
+                if (!videoId) return;
+
+                const onPlayerReady = (event) => {
+                    playerInstanceRef.current = event.target;
+                    setDuration(event.target.getDuration());
+                };
+
+                const onPlayerStateChange = (event) => {
+                    const player = event.target;
+                    const state = event.data;
+                    
+                    // YT.PlayerState: UNSTARTED (-1), ENDED (0), PLAYING (1), PAUSED (2), BUFFERING (3), CUED (5)
+                    if (state === 1) { // PLAYING
+                        setIsPlaying(true);
+                        if (isHost) {
+                            updateRoomState({ isPlaying: true, currentTime: Math.floor(player.getCurrentTime()) });
+                        }
+                    } else if (state === 2) { // PAUSED
+                        setIsPlaying(false);
+                        if (isHost) {
+                            updateRoomState({ isPlaying: false, currentTime: Math.floor(player.getCurrentTime()) });
+                        }
+                    }
+                };
+
+                if (window.YT && window.YT.Player) {
+                    playerInstanceRef.current = new window.YT.Player('youtube-player', {
+                        videoId: videoId,
+                        playerVars: {
+                            controls: 0, // Hide YouTube controls
+                            modestbranding: 1,
+                            rel: 0,
+                            fs: 0, // Disable fullscreen button
+                            iv_load_policy: 3
+                        },
+                        events: {
+                            onReady: onPlayerReady,
+                            onStateChange: onPlayerStateChange
+                        }
+                    });
+                }
+
+                return () => {
+                    if (playerInstanceRef.current && playerInstanceRef.current.destroy) {
+                        playerInstanceRef.current.destroy();
+                        playerInstanceRef.current = null;
+                    }
+                };
+            }, [videoId]);
+
+            // Update current time
+            useEffect(() => {
+                if (!playerInstanceRef.current || !isPlaying) return;
+
+                const interval = setInterval(() => {
+                    if (playerInstanceRef.current && playerInstanceRef.current.getCurrentTime) {
+                        const time = Math.floor(playerInstanceRef.current.getCurrentTime());
+                        setCurrentTime(time);
+                        
+                        if (isHost && !isSeekingRef.current) {
+                            updateRoomState({ currentTime: time, isPlaying: true });
+                        }
+                    }
+                }, 1000);
+
+                return () => clearInterval(interval);
+            }, [isPlaying, isHost]);
+
+            // Sync with room state (for viewers)
+            useEffect(() => {
+                if (!roomId || !videoId || isHost) return;
 
                 const syncState = async () => {
                     try {
@@ -237,15 +385,24 @@
                         if (result) {
                             const data = JSON.parse(result.value);
                             
-                            if (!isHost) {
-                                if (data.videoId !== videoId) {
-                                    setVideoId(data.videoId);
-                                }
-                                if (Math.abs(data.currentTime - currentTime) > 2) {
+                            if (data.videoId !== videoId) {
+                                setVideoId(data.videoId);
+                            }
+                            
+                            if (playerInstanceRef.current) {
+                                const currentPlayerTime = Math.floor(playerInstanceRef.current.getCurrentTime());
+                                
+                                // Sync time if difference is more than 3 seconds
+                                if (Math.abs(data.currentTime - currentPlayerTime) > 3) {
+                                    playerInstanceRef.current.seekTo(data.currentTime, true);
                                     setCurrentTime(data.currentTime);
                                 }
-                                if (data.isPlaying !== isPlaying) {
-                                    setIsPlaying(data.isPlaying);
+                                
+                                // Sync play/pause state
+                                if (data.isPlaying && !isPlaying) {
+                                    playerInstanceRef.current.playVideo();
+                                } else if (!data.isPlaying && isPlaying) {
+                                    playerInstanceRef.current.pauseVideo();
                                 }
                             }
                         }
@@ -254,33 +411,72 @@
                     }
                 };
 
-                syncIntervalRef.current = setInterval(syncState, 1000);
+                syncIntervalRef.current = setInterval(syncState, 2000);
                 return () => clearInterval(syncIntervalRef.current);
-            }, [roomId, videoId, isHost, currentTime, isPlaying]);
+            }, [roomId, videoId, isHost, isPlaying]);
 
             const togglePlayback = () => {
-                const newState = !isPlaying;
-                setIsPlaying(newState);
-                if (isHost) {
-                    updateRoomState({ isPlaying: newState, currentTime });
+                if (!playerInstanceRef.current) return;
+                
+                if (isPlaying) {
+                    playerInstanceRef.current.pauseVideo();
+                } else {
+                    playerInstanceRef.current.playVideo();
                 }
             };
 
-            useEffect(() => {
-                if (!isPlaying) return;
+            const handleSeek = (e) => {
+                if (!playerInstanceRef.current) return;
                 
-                const interval = setInterval(() => {
-                    setCurrentTime(t => {
-                        const newTime = t + 1;
-                        if (isHost) {
-                            updateRoomState({ currentTime: newTime });
-                        }
-                        return newTime;
-                    });
-                }, 1000);
+                const newTime = parseInt(e.target.value);
+                isSeekingRef.current = true;
+                playerInstanceRef.current.seekTo(newTime, true);
+                setCurrentTime(newTime);
                 
-                return () => clearInterval(interval);
-            }, [isPlaying, isHost, roomId]);
+                if (isHost) {
+                    updateRoomState({ currentTime: newTime, isPlaying });
+                }
+                
+                setTimeout(() => {
+                    isSeekingRef.current = false;
+                }, 500);
+            };
+
+            const handleVolumeChange = (e) => {
+                if (!playerInstanceRef.current) return;
+                
+                const newVolume = parseInt(e.target.value);
+                setVolume(newVolume);
+                playerInstanceRef.current.setVolume(newVolume);
+                
+                if (newVolume === 0) {
+                    setIsMuted(true);
+                } else if (isMuted) {
+                    setIsMuted(false);
+                }
+            };
+
+            const toggleMute = () => {
+                if (!playerInstanceRef.current) return;
+                
+                if (isMuted) {
+                    playerInstanceRef.current.unMute();
+                    playerInstanceRef.current.setVolume(volume || 50);
+                    setIsMuted(false);
+                } else {
+                    playerInstanceRef.current.mute();
+                    setIsMuted(true);
+                }
+            };
+
+            const toggleFullscreen = () => {
+                const container = document.getElementById('player-container');
+                if (!document.fullscreenElement) {
+                    container.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            };
 
             const copyRoomLink = () => {
                 navigator.clipboard.writeText(roomId);
@@ -474,7 +670,6 @@
                                 marginBottom: '20px',
                                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
                             }}>
-                                {/* Toggle between search and URL */}
                                 <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                                     <button
                                         onClick={() => setInputMode('search')}
@@ -494,255 +689,4 @@
                                             gap: '8px'
                                         }}
                                     >
-                                        <Search style={{ width: '16px', height: '16px' }} />
-                                        Search Videos
-                                    </button>
-                                    <button
-                                        onClick={() => setInputMode('url')}
-                                        style={{
-                                            flex: 1,
-                                            background: inputMode === 'url' ? '#667eea' : '#e2e8f0',
-                                            color: inputMode === 'url' ? 'white' : '#4a5568',
-                                            padding: '10px',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            fontSize: '14px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        <Link style={{ width: '16px', height: '16px' }} />
-                                        Paste URL
-                                    </button>
-                                </div>
-
-                                {inputMode === 'search' ? (
-                                    <div>
-                                        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                                            <input
-                                                type="text"
-                                                placeholder="Search for videos..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') searchVideos();
-                                                }}
-                                                style={{
-                                                    flex: 1,
-                                                    background: 'white',
-                                                    border: '2px solid #e2e8f0',
-                                                    borderRadius: '10px',
-                                                    padding: '12px 16px',
-                                                    fontSize: '16px',
-                                                    outline: 'none'
-                                                }}
-                                            />
-                                            <button
-                                                onClick={searchVideos}
-                                                disabled={isSearching}
-                                                style={{
-                                                    background: '#667eea',
-                                                    color: 'white',
-                                                    padding: '12px 24px',
-                                                    borderRadius: '10px',
-                                                    border: 'none',
-                                                    cursor: isSearching ? 'wait' : 'pointer',
-                                                    fontWeight: '600',
-                                                    fontSize: '16px',
-                                                    opacity: isSearching ? 0.7 : 1
-                                                }}
-                                            >
-                                                {isSearching ? 'Searching...' : 'Search'}
-                                            </button>
-                                        </div>
-
-                                        {searchResults.length > 0 && (
-                                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                                {searchResults.map((video) => (
-                                                    <div
-                                                        key={video.id.videoId}
-                                                        className="search-result"
-                                                        onClick={() => selectVideo(video)}
-                                                        style={{
-                                                            display: 'flex',
-                                                            gap: '12px',
-                                                            padding: '12px',
-                                                            borderRadius: '8px',
-                                                            cursor: 'pointer',
-                                                            marginBottom: '8px',
-                                                            transition: 'background 0.2s'
-                                                        }}
-                                                    >
-                                                        <img
-                                                            src={video.snippet.thumbnails.default.url}
-                                                            alt={video.snippet.title}
-                                                            style={{
-                                                                width: '120px',
-                                                                height: '90px',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '6px'
-                                                            }}
-                                                        />
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{
-                                                                fontWeight: '600',
-                                                                color: '#1a202c',
-                                                                marginBottom: '4px',
-                                                                fontSize: '14px'
-                                                            }}>
-                                                                {video.snippet.title}
-                                                            </div>
-                                                            <div style={{
-                                                                color: '#718096',
-                                                                fontSize: '12px'
-                                                            }}>
-                                                                {video.snippet.channelTitle}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', gap: '10px' }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Paste YouTube URL here..."
-                                            value={videoUrl}
-                                            onChange={(e) => setVideoUrl(e.target.value)}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') loadVideo();
-                                            }}
-                                            style={{
-                                                flex: 1,
-                                                background: 'white',
-                                                border: '2px solid #e2e8f0',
-                                                borderRadius: '10px',
-                                                padding: '12px 16px',
-                                                fontSize: '16px',
-                                                outline: 'none'
-                                            }}
-                                        />
-                                        <button
-                                            onClick={loadVideo}
-                                            style={{
-                                                background: '#667eea',
-                                                color: 'white',
-                                                padding: '12px 24px',
-                                                borderRadius: '10px',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                fontWeight: '600',
-                                                fontSize: '16px'
-                                            }}
-                                        >
-                                            Load Video
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div style={{
-                            background: 'rgba(255, 255, 255, 0.95)',
-                            borderRadius: '15px',
-                            overflow: 'hidden',
-                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
-                        }}>
-                            {videoId ? (
-                                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
-                                    <iframe
-                                        ref={playerRef}
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            width: '100%',
-                                            height: '100%'
-                                        }}
-                                        src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(currentTime)}&autoplay=${isPlaying ? 1 : 0}`}
-                                        title="YouTube video player"
-                                        frameBorder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                    ></iframe>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    position: 'relative',
-                                    paddingBottom: '56.25%',
-                                    height: 0,
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                }}>
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        textAlign: 'center',
-                                        color: 'white'
-                                    }}>
-                                        <Play style={{ width: '64px', height: '64px', margin: '0 auto 20px', opacity: 0.8 }} />
-                                        <p style={{ fontSize: '18px', fontWeight: '500' }}>
-                                            {isHost ? 'Search for a video or paste a URL above' : 'Waiting for host to load a video...'}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {videoId && isHost && (
-                                <div style={{
-                                    padding: '20px',
-                                    background: 'rgba(0, 0, 0, 0.05)',
-                                    borderTop: '1px solid rgba(0, 0, 0, 0.1)'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <button
-                                            onClick={togglePlayback}
-                                            style={{
-                                                background: '#667eea',
-                                                color: 'white',
-                                                padding: '12px',
-                                                borderRadius: '50%',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                boxShadow: '0 4px 10px rgba(102, 126, 234, 0.4)'
-                                            }}
-                                        >
-                                            {isPlaying ? (
-                                                <Pause style={{ width: '20px', height: '20px' }} />
-                                            ) : (
-                                                <Play style={{ width: '20px', height: '20px' }} />
-                                            )}
-                                        </button>
-                                        <div style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: '600', color: '#1a202c' }}>
-                                            {formatTime(currentTime)}
-                                        </div>
-                                        <div style={{ flex: 1, color: '#718096', fontSize: '14px' }}>
-                                            {isPlaying ? '▶ Playing' : '⏸ Paused'}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ marginTop: '20px', textAlign: 'center', color: 'white', fontSize: '14px' }}>
-                            💡 Share the Room ID with friends to watch together!
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        ReactDOM.render(<WatchTogether />, document.getElementById('root'));
-    </script>
-</body>
-</html>
+                                        <Search style={{ width: '16px', height: '16px
