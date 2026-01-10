@@ -196,6 +196,13 @@
                         console.error('API Error:', data.error);
                         alert('Search failed. Please check your API key.');
                     }
+                } catch (error) {
+                    console.error('Search error:', error);
+                    alert('Search failed. Please try pasting a URL instead.');
+                } finally {
+                    setIsSearching(false);
+                }
+            };
 
             const selectVideo = (video) => {
                 const id = video.id.videoId;
