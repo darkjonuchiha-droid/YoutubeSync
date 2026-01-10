@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Users, Link, Copy, Check } from 'lucide-react';
+import { Play, Pause, Users, Copy, Check } from 'lucide-react';
 
 export default function WatchTogether() {
   const [roomId, setRoomId] = useState('');
@@ -9,6 +9,7 @@ export default function WatchTogether() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isHost, setIsHost] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [joinInput, setJoinInput] = useState('');
   const playerRef = useRef(null);
   const syncIntervalRef = useRef(null);
 
@@ -31,17 +32,20 @@ export default function WatchTogether() {
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomId(newRoomId);
     setIsHost(true);
-    initializeStorage(newRoomId, true);
+    initializeStorage(newRoomId);
   };
 
   const joinRoom = (id) => {
-    setRoomId(id);
-    setIsHost(false);
-    loadRoomState(id);
+    const cleanId = id.trim().toUpperCase();
+    if (cleanId) {
+      setRoomId(cleanId);
+      setIsHost(false);
+      loadRoomState(cleanId);
+    }
   };
 
   // Storage functions
-  const initializeStorage = async (roomId, asHost) => {
+  const initializeStorage = async (roomId) => {
     try {
       const roomData = {
         videoId: '',
@@ -68,6 +72,7 @@ export default function WatchTogether() {
       }
     } catch (error) {
       console.error('Error loading room:', error);
+      // Room might not exist yet
     }
   };
 
@@ -95,6 +100,8 @@ export default function WatchTogether() {
     const id = extractVideoId(videoUrl);
     if (id) {
       setVideoId(id);
+      setCurrentTime(0);
+      setIsPlaying(false);
       if (isHost) {
         updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
       }
@@ -111,8 +118,8 @@ export default function WatchTogether() {
         if (result) {
           const data = JSON.parse(result.value);
           
-          // Only sync if we're not the one who made the last update
-          if (!isHost || data.lastUpdate > Date.now() - 500) {
+          // Only sync if we're a viewer or data is fresh
+          if (!isHost) {
             if (data.videoId !== videoId) {
               setVideoId(data.videoId);
             }
@@ -131,7 +138,7 @@ export default function WatchTogether() {
 
     syncIntervalRef.current = setInterval(syncState, 1000);
     return () => clearInterval(syncIntervalRef.current);
-  }, [roomId, videoId, isHost]);
+  }, [roomId, videoId, isHost, currentTime, isPlaying]);
 
   // Handle play/pause
   const togglePlayback = () => {
@@ -157,7 +164,7 @@ export default function WatchTogether() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [isPlaying, isHost]);
+  }, [isPlaying, isHost, roomId]);
 
   const copyRoomLink = () => {
     navigator.clipboard.writeText(roomId);
@@ -173,41 +180,113 @@ export default function WatchTogether() {
 
   if (!roomId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-white/20 shadow-2xl">
-          <div className="flex items-center justify-center mb-6">
-            <Users className="w-12 h-12 text-purple-400" />
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '20px',
+          padding: '40px',
+          maxWidth: '450px',
+          width: '100%',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <Users style={{ width: '60px', height: '60px', color: '#667eea', margin: '0 auto 20px' }} />
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#1a202c', marginBottom: '10px' }}>
+              Watch Together
+            </h1>
+            <p style={{ color: '#4a5568', fontSize: '16px' }}>
+              Watch YouTube videos in sync with friends
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-white text-center mb-2">Watch Together</h1>
-          <p className="text-purple-200 text-center mb-8">Watch YouTube videos in sync with friends</p>
           
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <button
               onClick={createRoom}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-105 shadow-lg"
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                fontWeight: '600',
+                padding: '15px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '16px',
+                transition: 'transform 0.2s',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+              }}
+              onMouseOver={(e) => e.target.style.transform = 'scale(1.02)'}
+              onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
             >
               Create New Room
             </button>
             
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/20"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-transparent text-purple-200">or</span>
-              </div>
+            <div style={{ position: 'relative', textAlign: 'center', margin: '10px 0' }}>
+              <div style={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: 0, 
+                right: 0, 
+                height: '1px', 
+                background: '#e2e8f0' 
+              }}></div>
+              <span style={{ 
+                position: 'relative', 
+                background: 'rgba(255, 255, 255, 0.95)', 
+                padding: '0 15px', 
+                color: '#718096',
+                fontSize: '14px'
+              }}>
+                or
+              </span>
             </div>
             
-            <input
-              type="text"
-              placeholder="Enter Room ID"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && e.target.value) {
-                  joinRoom(e.target.value.toUpperCase());
-                }
-              }}
-            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Enter Room ID"
+                value={joinInput}
+                onChange={(e) => setJoinInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && joinInput) {
+                    joinRoom(joinInput);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  background: 'white',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              />
+              <button
+                onClick={() => joinRoom(joinInput)}
+                style={{
+                  background: '#48bb78',
+                  color: 'white',
+                  fontWeight: '600',
+                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}
+              >
+                Join
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -215,42 +294,104 @@ export default function WatchTogether() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black p-4">
-      <div className="max-w-6xl mx-auto">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 mb-4 border border-white/20">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6 text-purple-400" />
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '15px',
+          padding: '20px',
+          marginBottom: '20px',
+          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <Users style={{ width: '28px', height: '28px', color: '#667eea' }} />
               <div>
-                <div className="text-white font-semibold">Room ID: {roomId}</div>
-                <div className="text-purple-300 text-sm">{isHost ? 'Host' : 'Viewer'}</div>
+                <div style={{ fontWeight: '600', fontSize: '18px', color: '#1a202c' }}>
+                  Room: {roomId}
+                </div>
+                <div style={{ color: '#718096', fontSize: '14px' }}>
+                  {isHost ? '👑 Host' : '👤 Viewer'}
+                </div>
               </div>
             </div>
             <button
               onClick={copyRoomLink}
-              className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-all"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#667eea',
+                color: 'white',
+                padding: '10px 20px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px'
+              }}
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied!' : 'Copy Room ID'}
+              {copied ? (
+                <>
+                  <Check style={{ width: '16px', height: '16px' }} />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy style={{ width: '16px', height: '16px' }} />
+                  Copy Room ID
+                </>
+              )}
             </button>
           </div>
         </div>
 
         {/* Video Input */}
         {isHost && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 mb-4 border border-white/20">
-            <div className="flex gap-2">
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '15px',
+            padding: '20px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <input
                 type="text"
                 placeholder="Paste YouTube URL here..."
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
-                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') loadVideo();
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: '250px',
+                  background: 'white',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  outline: 'none'
+                }}
               />
               <button
                 onClick={loadVideo}
-                className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg transition-all font-semibold"
+                style={{
+                  background: '#667eea',
+                  color: 'white',
+                  padding: '12px 24px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '16px'
+                }}
               >
                 Load Video
               </button>
@@ -259,12 +400,23 @@ export default function WatchTogether() {
         )}
 
         {/* Video Player */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-xl overflow-hidden border border-white/20 shadow-2xl">
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '15px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+        }}>
           {videoId ? (
-            <div className="aspect-video bg-black">
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
               <iframe
                 ref={playerRef}
-                className="w-full h-full"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%'
+                }}
                 src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(currentTime)}&autoplay=${isPlaying ? 1 : 0}`}
                 title="YouTube video player"
                 frameBorder="0"
@@ -273,10 +425,25 @@ export default function WatchTogether() {
               ></iframe>
             </div>
           ) : (
-            <div className="aspect-video bg-black/50 flex items-center justify-center">
-              <div className="text-center text-purple-300">
-                <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p className="text-lg">
+            <div style={{
+              position: 'relative',
+              paddingBottom: '56.25%',
+              height: 0,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center',
+                color: 'white'
+              }}>
+                <Play style={{ width: '64px', height: '64px', margin: '0 auto 20px', opacity: 0.8 }} />
+                <p style={{ fontSize: '18px', fontWeight: '500' }}>
                   {isHost ? 'Paste a YouTube URL above to get started' : 'Waiting for host to load a video...'}
                 </p>
               </div>
@@ -285,27 +452,46 @@ export default function WatchTogether() {
 
           {/* Controls */}
           {videoId && isHost && (
-            <div className="p-4 bg-black/30">
-              <div className="flex items-center gap-4">
+            <div style={{
+              padding: '20px',
+              background: 'rgba(0, 0, 0, 0.05)',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <button
                   onClick={togglePlayback}
-                  className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full transition-all"
+                  style={{
+                    background: '#667eea',
+                    color: 'white',
+                    padding: '12px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(102, 126, 234, 0.4)'
+                  }}
                 >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  {isPlaying ? (
+                    <Pause style={{ width: '20px', height: '20px' }} />
+                  ) : (
+                    <Play style={{ width: '20px', height: '20px' }} />
+                  )}
                 </button>
-                <div className="text-white font-mono">
+                <div style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: '600', color: '#1a202c' }}>
                   {formatTime(currentTime)}
                 </div>
-                <div className="flex-1 text-purple-300 text-sm">
-                  {isPlaying ? 'Playing' : 'Paused'}
+                <div style={{ flex: 1, color: '#718096', fontSize: '14px' }}>
+                  {isPlaying ? '▶ Playing' : '⏸ Paused'}
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-4 text-center text-purple-300 text-sm">
-          Share the Room ID with friends to watch together!
+        <div style={{ marginTop: '20px', textAlign: 'center', color: 'white', fontSize: '14px' }}>
+          💡 Share the Room ID with friends to watch together!
         </div>
       </div>
     </div>
