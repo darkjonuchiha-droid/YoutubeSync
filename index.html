@@ -10,6 +10,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+        .search-result:hover { background: rgba(102, 126, 234, 0.1); }
     </style>
 </head>
 <body>
@@ -50,6 +51,18 @@
             </svg>
         );
 
+        const Search = ({ style }) => (
+            <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        );
+
+        const Link = ({ style }) => (
+            <svg style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+        );
+
         // Mock storage API for standalone HTML (uses localStorage)
         window.storage = {
             async get(key, shared) {
@@ -79,6 +92,10 @@
             const [isHost, setIsHost] = useState(false);
             const [copied, setCopied] = useState(false);
             const [joinInput, setJoinInput] = useState('');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [isSearching, setIsSearching] = useState(false);
+            const [inputMode, setInputMode] = useState('search'); // 'search' or 'url'
             const playerRef = useRef(null);
             const syncIntervalRef = useRef(null);
 
@@ -157,6 +174,40 @@
                     await window.storage.set(`room_${roomId}`, JSON.stringify(newData), true);
                 } catch (error) {
                     console.error('Error updating room:', error);
+                }
+            };
+
+            const searchVideos = async () => {
+                if (!searchQuery.trim()) return;
+                
+                setIsSearching(true);
+                try {
+                    // Using a public API to search YouTube videos
+                    const response = await fetch(
+                        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=6&q=${encodeURIComponent(searchQuery)}&type=video&key=AIzaSyDKpXLRoW8Cv0xPbSjPZGr5T_EH6HpqRQU`
+                    );
+                    const data = await response.json();
+                    
+                    if (data.items) {
+                        setSearchResults(data.items);
+                    }
+                } catch (error) {
+                    console.error('Search error:', error);
+                    alert('Search failed. Please try pasting a URL instead.');
+                } finally {
+                    setIsSearching(false);
+                }
+            };
+
+            const selectVideo = (video) => {
+                const id = video.id.videoId;
+                setVideoId(id);
+                setCurrentTime(0);
+                setIsPlaying(false);
+                setSearchResults([]);
+                setSearchQuery('');
+                if (isHost) {
+                    updateRoomState({ videoId: id, currentTime: 0, isPlaying: false });
                 }
             };
 
@@ -418,42 +469,177 @@
                                 marginBottom: '20px',
                                 boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
                             }}>
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    <input
-                                        type="text"
-                                        placeholder="Paste YouTube URL here..."
-                                        value={videoUrl}
-                                        onChange={(e) => setVideoUrl(e.target.value)}
-                                        onKeyPress={(e) => {
-                                            if (e.key === 'Enter') loadVideo();
-                                        }}
+                                {/* Toggle between search and URL */}
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                                    <button
+                                        onClick={() => setInputMode('search')}
                                         style={{
                                             flex: 1,
-                                            minWidth: '250px',
-                                            background: 'white',
-                                            border: '2px solid #e2e8f0',
-                                            borderRadius: '10px',
-                                            padding: '12px 16px',
-                                            fontSize: '16px',
-                                            outline: 'none'
-                                        }}
-                                    />
-                                    <button
-                                        onClick={loadVideo}
-                                        style={{
-                                            background: '#667eea',
-                                            color: 'white',
-                                            padding: '12px 24px',
-                                            borderRadius: '10px',
+                                            background: inputMode === 'search' ? '#667eea' : '#e2e8f0',
+                                            color: inputMode === 'search' ? 'white' : '#4a5568',
+                                            padding: '10px',
+                                            borderRadius: '8px',
                                             border: 'none',
                                             cursor: 'pointer',
                                             fontWeight: '600',
-                                            fontSize: '16px'
+                                            fontSize: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
                                         }}
                                     >
-                                        Load Video
+                                        <Search style={{ width: '16px', height: '16px' }} />
+                                        Search Videos
+                                    </button>
+                                    <button
+                                        onClick={() => setInputMode('url')}
+                                        style={{
+                                            flex: 1,
+                                            background: inputMode === 'url' ? '#667eea' : '#e2e8f0',
+                                            color: inputMode === 'url' ? 'white' : '#4a5568',
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontWeight: '600',
+                                            fontSize: '14px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <Link style={{ width: '16px', height: '16px' }} />
+                                        Paste URL
                                     </button>
                                 </div>
+
+                                {inputMode === 'search' ? (
+                                    <div>
+                                        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Search for videos..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') searchVideos();
+                                                }}
+                                                style={{
+                                                    flex: 1,
+                                                    background: 'white',
+                                                    border: '2px solid #e2e8f0',
+                                                    borderRadius: '10px',
+                                                    padding: '12px 16px',
+                                                    fontSize: '16px',
+                                                    outline: 'none'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={searchVideos}
+                                                disabled={isSearching}
+                                                style={{
+                                                    background: '#667eea',
+                                                    color: 'white',
+                                                    padding: '12px 24px',
+                                                    borderRadius: '10px',
+                                                    border: 'none',
+                                                    cursor: isSearching ? 'wait' : 'pointer',
+                                                    fontWeight: '600',
+                                                    fontSize: '16px',
+                                                    opacity: isSearching ? 0.7 : 1
+                                                }}
+                                            >
+                                                {isSearching ? 'Searching...' : 'Search'}
+                                            </button>
+                                        </div>
+
+                                        {searchResults.length > 0 && (
+                                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                                {searchResults.map((video) => (
+                                                    <div
+                                                        key={video.id.videoId}
+                                                        className="search-result"
+                                                        onClick={() => selectVideo(video)}
+                                                        style={{
+                                                            display: 'flex',
+                                                            gap: '12px',
+                                                            padding: '12px',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            marginBottom: '8px',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={video.snippet.thumbnails.default.url}
+                                                            alt={video.snippet.title}
+                                                            style={{
+                                                                width: '120px',
+                                                                height: '90px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: '6px'
+                                                            }}
+                                                        />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{
+                                                                fontWeight: '600',
+                                                                color: '#1a202c',
+                                                                marginBottom: '4px',
+                                                                fontSize: '14px'
+                                                            }}>
+                                                                {video.snippet.title}
+                                                            </div>
+                                                            <div style={{
+                                                                color: '#718096',
+                                                                fontSize: '12px'
+                                                            }}>
+                                                                {video.snippet.channelTitle}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Paste YouTube URL here..."
+                                            value={videoUrl}
+                                            onChange={(e) => setVideoUrl(e.target.value)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') loadVideo();
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                background: 'white',
+                                                border: '2px solid #e2e8f0',
+                                                borderRadius: '10px',
+                                                padding: '12px 16px',
+                                                fontSize: '16px',
+                                                outline: 'none'
+                                            }}
+                                        />
+                                        <button
+                                            onClick={loadVideo}
+                                            style={{
+                                                background: '#667eea',
+                                                color: 'white',
+                                                padding: '12px 24px',
+                                                borderRadius: '10px',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '16px'
+                                            }}
+                                        >
+                                            Load Video
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -498,7 +684,7 @@
                                     }}>
                                         <Play style={{ width: '64px', height: '64px', margin: '0 auto 20px', opacity: 0.8 }} />
                                         <p style={{ fontSize: '18px', fontWeight: '500' }}>
-                                            {isHost ? 'Paste a YouTube URL above to get started' : 'Waiting for host to load a video...'}
+                                            {isHost ? 'Search for a video or paste a URL above' : 'Waiting for host to load a video...'}
                                         </p>
                                     </div>
                                 </div>
