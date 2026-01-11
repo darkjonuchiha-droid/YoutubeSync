@@ -31,7 +31,8 @@
             pointer-events: none;
         }
         .video-container:hover .controls-overlay,
-        .controls-overlay.show {
+        .controls-overlay.show,
+        .controls-overlay.force-show {
             opacity: 1;
             pointer-events: all;
         }
@@ -39,6 +40,12 @@
             height: 100vh;
         }
         #player-container:fullscreen .controls-overlay {
+            padding: 60px 30px 30px;
+        }
+        #player-container:-webkit-full-screen .video-container {
+            height: 100vh;
+        }
+        #player-container:-webkit-full-screen .controls-overlay {
             padding: 60px 30px 30px;
         }
         .volume-slider {
@@ -343,6 +350,8 @@
                 const onPlayerReady = (event) => {
                     playerInstanceRef.current = event.target;
                     setDuration(event.target.getDuration());
+                    // Autoplay the video
+                    event.target.playVideo();
                 };
 
                 const onPlayerStateChange = (event) => {
@@ -517,13 +526,35 @@
                     clearTimeout(hideControlsTimeoutRef.current);
                 }
                 
-                // Hide controls after 3 seconds of inactivity
+                // Hide controls after 3 seconds of inactivity (only in fullscreen)
                 hideControlsTimeoutRef.current = setTimeout(() => {
-                    if (document.fullscreenElement) {
+                    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                    if (isFullscreen && isPlaying) {
                         setShowControls(false);
                     }
                 }, 3000);
             };
+
+            // Listen for fullscreen changes
+            useEffect(() => {
+                const handleFullscreenChange = () => {
+                    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                    if (!isFullscreen) {
+                        setShowControls(true);
+                        if (hideControlsTimeoutRef.current) {
+                            clearTimeout(hideControlsTimeoutRef.current);
+                        }
+                    }
+                };
+
+                document.addEventListener('fullscreenchange', handleFullscreenChange);
+                document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+                return () => {
+                    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                    document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+                };
+            }, []);
 
             // Cleanup timeout on unmount
             useEffect(() => {
@@ -921,7 +952,7 @@
                                     }}></div>
                                     
                                     {/* Overlay Custom Controls */}
-                                    <div className={`controls-overlay ${showControls ? 'show' : ''}`}>
+                                    <div className={`controls-overlay ${showControls ? 'force-show' : ''}`}>
                                         {/* Progress Bar */}
                                         <input
                                             type="range"
