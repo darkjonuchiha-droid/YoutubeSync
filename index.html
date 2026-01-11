@@ -20,6 +20,12 @@
         .video-container.show-cursor {
             cursor: default;
         }
+        .aspect-ratio-wrapper {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            background: #000;
+        }
         .controls-overlay {
             position: absolute;
             bottom: 0;
@@ -56,12 +62,11 @@
             height: 100%;
             position: relative;
         }
-        #player-container:fullscreen .video-container > div:first-child,
-        #player-container:-webkit-full-screen .video-container > div:first-child,
-        #player-container:-moz-full-screen .video-container > div:first-child {
+        #player-container:fullscreen .aspect-ratio-wrapper,
+        #player-container:-webkit-full-screen .aspect-ratio-wrapper,
+        #player-container:-moz-full-screen .aspect-ratio-wrapper {
             padding-bottom: 0 !important;
             height: 100% !important;
-            width: 100% !important;
         }
         #player-container:fullscreen #youtube-player,
         #player-container:-webkit-full-screen #youtube-player,
@@ -981,9 +986,8 @@
                                     onMouseMove={handleMouseMove}
                                     onClick={handleMouseMove}
                                     onMouseLeave={() => setShowControls(true)}
-                                    style={{ position: 'relative', background: '#000' }}
                                 >
-                                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                                    <div className="aspect-ratio-wrapper" style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
                                         <div id="youtube-player" style={{
                                             position: 'absolute',
                                             top: 0,
