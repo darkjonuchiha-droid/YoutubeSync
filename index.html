@@ -12,6 +12,35 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
         .search-result:hover { background: rgba(102, 126, 234, 0.1); }
+        .video-container {
+            position: relative;
+            cursor: none;
+        }
+        .video-container.show-cursor {
+            cursor: default;
+        }
+        .controls-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+            padding: 40px 20px 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .video-container:hover .controls-overlay,
+        .controls-overlay.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+        #player-container:fullscreen .video-container {
+            height: 100vh;
+        }
+        #player-container:fullscreen .controls-overlay {
+            padding: 60px 30px 30px;
+        }
         .volume-slider {
             -webkit-appearance: none;
             appearance: none;
@@ -172,10 +201,12 @@
             const [searchResults, setSearchResults] = useState([]);
             const [isSearching, setIsSearching] = useState(false);
             const [inputMode, setInputMode] = useState('search');
+            const [showControls, setShowControls] = useState(true);
             const playerRef = useRef(null);
             const syncIntervalRef = useRef(null);
             const playerInstanceRef = useRef(null);
             const isSeekingRef = useRef(false);
+            const hideControlsTimeoutRef = useRef(null);
 
             const extractVideoId = (url) => {
                 const patterns = [
@@ -477,6 +508,31 @@
                     document.exitFullscreen();
                 }
             };
+
+            const handleMouseMove = () => {
+                setShowControls(true);
+                
+                // Clear existing timeout
+                if (hideControlsTimeoutRef.current) {
+                    clearTimeout(hideControlsTimeoutRef.current);
+                }
+                
+                // Hide controls after 3 seconds of inactivity
+                hideControlsTimeoutRef.current = setTimeout(() => {
+                    if (document.fullscreenElement) {
+                        setShowControls(false);
+                    }
+                }, 3000);
+            };
+
+            // Cleanup timeout on unmount
+            useEffect(() => {
+                return () => {
+                    if (hideControlsTimeoutRef.current) {
+                        clearTimeout(hideControlsTimeoutRef.current);
+                    }
+                };
+            }, []);
 
             const copyRoomLink = () => {
                 navigator.clipboard.writeText(roomId);
@@ -850,23 +906,22 @@
                             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
                         }}>
                             {videoId ? (
-                                <>
-                                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
-                                        <div id="youtube-player" style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            width: '100%',
-                                            height: '100%'
-                                        }}></div>
-                                    </div>
+                                <div 
+                                    className={`video-container ${showControls ? 'show-cursor' : ''}`}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseLeave={() => setShowControls(true)}
+                                    style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}
+                                >
+                                    <div id="youtube-player" style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%'
+                                    }}></div>
                                     
-                                    {/* Custom Controls */}
-                                    <div style={{
-                                        padding: '15px 20px',
-                                        background: 'rgba(0, 0, 0, 0.05)',
-                                        borderTop: '1px solid rgba(0, 0, 0, 0.1)'
-                                    }}>
+                                    {/* Overlay Custom Controls */}
+                                    <div className={`controls-overlay ${showControls ? 'show' : ''}`}>
                                         {/* Progress Bar */}
                                         <input
                                             type="range"
@@ -883,7 +938,7 @@
                                             <button
                                                 onClick={togglePlayback}
                                                 style={{
-                                                    background: '#667eea',
+                                                    background: 'rgba(102, 126, 234, 0.9)',
                                                     color: 'white',
                                                     padding: '10px',
                                                     borderRadius: '50%',
@@ -892,7 +947,7 @@
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)',
+                                                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                                                     width: '40px',
                                                     height: '40px'
                                                 }}
@@ -909,7 +964,8 @@
                                                 fontFamily: 'monospace', 
                                                 fontSize: '14px', 
                                                 fontWeight: '600', 
-                                                color: '#1a202c' 
+                                                color: 'white',
+                                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
                                             }}>
                                                 {formatTime(currentTime)} / {formatTime(duration)}
                                             </div>
@@ -930,9 +986,9 @@
                                                     }}
                                                 >
                                                     {isMuted || volume === 0 ? (
-                                                        <VolumeX style={{ width: '20px', height: '20px', color: '#4a5568' }} />
+                                                        <VolumeX style={{ width: '20px', height: '20px', color: 'white' }} />
                                                     ) : (
-                                                        <Volume2 style={{ width: '20px', height: '20px', color: '#4a5568' }} />
+                                                        <Volume2 style={{ width: '20px', height: '20px', color: 'white' }} />
                                                     )}
                                                 </button>
                                                 <input
@@ -957,11 +1013,11 @@
                                                     alignItems: 'center'
                                                 }}
                                             >
-                                                <Maximize style={{ width: '20px', height: '20px', color: '#4a5568' }} />
+                                                <Maximize style={{ width: '20px', height: '20px', color: 'white' }} />
                                             </button>
                                         </div>
                                     </div>
-                                </>
+                                </div>
                             ) : (
                                 <div style={{
                                     position: 'relative',
