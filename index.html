@@ -63,7 +63,12 @@
         #player-container:fullscreen .controls-overlay,
         #player-container:-webkit-full-screen .controls-overlay,
         #player-container:-moz-full-screen .controls-overlay {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
             padding: 60px 30px 30px;
+            z-index: 9999 !important;
         }
         .volume-slider {
             -webkit-appearance: none;
@@ -316,7 +321,7 @@
                 setIsSearching(true);
                 try {
                     // ⚠️ REPLACE 'YOUR_API_KEY_HERE' WITH YOUR ACTUAL YOUTUBE API KEY
-                    const API_KEY = 'AIzaSyDh0KrtaOpMWTL_WksTWpxkcuFBdFVq2Ks';
+                    const API_KEY = 'YOUR_API_KEY_HERE';
                     
                     const response = await fetch(
                         `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=6&q=${encodeURIComponent(searchQuery)}&type=video&key=${API_KEY}`
