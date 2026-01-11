@@ -529,7 +529,6 @@
             };
 
             const handleMouseMove = () => {
-                console.log('Mouse moved - showing controls');
                 setShowControls(true);
                 
                 // Clear existing timeout
@@ -540,7 +539,6 @@
                 // Hide controls after 3 seconds of inactivity (only in fullscreen while playing)
                 hideControlsTimeoutRef.current = setTimeout(() => {
                     const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-                    console.log('Timeout - isFullscreen:', isFullscreen, 'isPlaying:', isPlaying);
                     if (isFullscreen && isPlaying) {
                         setShowControls(false);
                     }
@@ -551,7 +549,6 @@
             useEffect(() => {
                 const handleFullscreenChange = () => {
                     const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-                    console.log('Fullscreen changed:', isFullscreen);
                     if (!isFullscreen) {
                         setShowControls(true);
                         if (hideControlsTimeoutRef.current) {
