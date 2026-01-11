@@ -24,28 +24,38 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.6) 70%, transparent 100%);
             padding: 40px 20px 20px;
             opacity: 0;
             transition: opacity 0.3s ease;
             pointer-events: none;
+            z-index: 1000;
         }
         .video-container:hover .controls-overlay,
         .controls-overlay.show,
         .controls-overlay.force-show {
-            opacity: 1;
-            pointer-events: all;
+            opacity: 1 !important;
+            pointer-events: all !important;
         }
         #player-container:fullscreen .video-container {
             height: 100vh;
+            padding-bottom: 0 !important;
         }
         #player-container:fullscreen .controls-overlay {
             padding: 60px 30px 30px;
         }
         #player-container:-webkit-full-screen .video-container {
             height: 100vh;
+            padding-bottom: 0 !important;
         }
         #player-container:-webkit-full-screen .controls-overlay {
+            padding: 60px 30px 30px;
+        }
+        #player-container:-moz-full-screen .video-container {
+            height: 100vh;
+            padding-bottom: 0 !important;
+        }
+        #player-container:-moz-full-screen .controls-overlay {
             padding: 60px 30px 30px;
         }
         .volume-slider {
@@ -519,6 +529,7 @@
             };
 
             const handleMouseMove = () => {
+                console.log('Mouse moved - showing controls');
                 setShowControls(true);
                 
                 // Clear existing timeout
@@ -526,9 +537,10 @@
                     clearTimeout(hideControlsTimeoutRef.current);
                 }
                 
-                // Hide controls after 3 seconds of inactivity (only in fullscreen)
+                // Hide controls after 3 seconds of inactivity (only in fullscreen while playing)
                 hideControlsTimeoutRef.current = setTimeout(() => {
-                    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+                    console.log('Timeout - isFullscreen:', isFullscreen, 'isPlaying:', isPlaying);
                     if (isFullscreen && isPlaying) {
                         setShowControls(false);
                     }
@@ -538,21 +550,27 @@
             // Listen for fullscreen changes
             useEffect(() => {
                 const handleFullscreenChange = () => {
-                    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+                    console.log('Fullscreen changed:', isFullscreen);
                     if (!isFullscreen) {
                         setShowControls(true);
                         if (hideControlsTimeoutRef.current) {
                             clearTimeout(hideControlsTimeoutRef.current);
                         }
+                    } else {
+                        // Show controls when entering fullscreen
+                        setShowControls(true);
                     }
                 };
 
                 document.addEventListener('fullscreenchange', handleFullscreenChange);
                 document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+                document.addEventListener('mozfullscreenchange', handleFullscreenChange);
 
                 return () => {
                     document.removeEventListener('fullscreenchange', handleFullscreenChange);
                     document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+                    document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
                 };
             }, []);
 
@@ -940,6 +958,7 @@
                                 <div 
                                     className={`video-container ${showControls ? 'show-cursor' : ''}`}
                                     onMouseMove={handleMouseMove}
+                                    onClick={handleMouseMove}
                                     onMouseLeave={() => setShowControls(true)}
                                     style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}
                                 >
