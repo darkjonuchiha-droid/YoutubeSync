@@ -257,11 +257,13 @@
             const [isSearching, setIsSearching] = useState(false);
             const [inputMode, setInputMode] = useState('search');
             const [showControls, setShowControls] = useState(true);
+            const [isFullscreen, setIsFullscreen] = useState(false);
             const playerRef = useRef(null);
             const syncIntervalRef = useRef(null);
             const playerInstanceRef = useRef(null);
             const isSeekingRef = useRef(false);
             const hideControlsTimeoutRef = useRef(null);
+            const fullscreenOverlayRef = useRef(null);
 
             const extractVideoId = (url) => {
                 const patterns = [
@@ -607,15 +609,24 @@
             // Listen for fullscreen changes
             useEffect(() => {
                 const handleFullscreenChange = () => {
-                    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-                    if (!isFullscreen) {
+                    const nowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+                    setIsFullscreen(nowFullscreen);
+                    
+                    if (!nowFullscreen) {
                         setShowControls(true);
                         if (hideControlsTimeoutRef.current) {
                             clearTimeout(hideControlsTimeoutRef.current);
                         }
+                        // Remove overlay when exiting fullscreen
+                        const overlay = document.getElementById('fullscreen-controls-overlay');
+                        if (overlay) {
+                            overlay.remove();
+                        }
                     } else {
                         // Show controls when entering fullscreen
                         setShowControls(true);
+                        // Create overlay when entering fullscreen
+                        createFullscreenOverlay();
                     }
                 };
 
@@ -629,6 +640,173 @@
                     document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
                 };
             }, []);
+
+            const createFullscreenOverlay = () => {
+                // Wait for fullscreen to be active
+                setTimeout(() => {
+                    const fsElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement;
+                    if (!fsElement) return;
+
+                    // Remove existing overlay if any
+                    const existingOverlay = document.getElementById('fullscreen-controls-overlay');
+                    if (existingOverlay) {
+                        existingOverlay.remove();
+                    }
+
+                    // Create overlay container
+                    const overlay = document.createElement('div');
+                    overlay.id = 'fullscreen-controls-overlay';
+                    overlay.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        z-index: 999999;
+                        pointer-events: none;
+                    `;
+
+                    fsElement.appendChild(overlay);
+                    fullscreenOverlayRef.current = overlay;
+
+                    // Render React controls into the overlay
+                    const root = ReactDOM.createRoot(overlay);
+                    root.render(<FullscreenControls />);
+                }, 100);
+            };
+
+            const FullscreenControls = () => {
+                const [localShowControls, setLocalShowControls] = React.useState(true);
+                const localHideTimeoutRef = React.useRef(null);
+
+                const handleOverlayMouseMove = () => {
+                    setLocalShowControls(true);
+                    
+                    if (localHideTimeoutRef.current) {
+                        clearTimeout(localHideTimeoutRef.current);
+                    }
+                    
+                    localHideTimeoutRef.current = setTimeout(() => {
+                        if (isPlaying) {
+                            setLocalShowControls(false);
+                        }
+                    }, 3000);
+                };
+
+                return (
+                    <div 
+                        onMouseMove={handleOverlayMouseMove}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            cursor: localShowControls ? 'default' : 'none'
+                        }}
+                    >
+                        <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            background: 'linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.6) 70%, transparent 100%)',
+                            padding: '60px 30px 30px',
+                            opacity: localShowControls ? 1 : 0,
+                            transition: 'opacity 0.3s ease',
+                            pointerEvents: localShowControls ? 'all' : 'none'
+                        }}>
+                            {/* Progress Bar */}
+                            <input
+                                type="range"
+                                min="0"
+                                max={duration || 0}
+                                value={currentTime}
+                                onChange={handleSeek}
+                                className="progress-bar"
+                                style={{ width: '100%', marginBottom: '15px' }}
+                            />
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={togglePlayback}
+                                    style={{
+                                        background: 'rgba(102, 126, 234, 0.9)',
+                                        color: 'white',
+                                        padding: '10px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                                        width: '40px',
+                                        height: '40px'
+                                    }}
+                                >
+                                    {isPlaying ? (
+                                        <Pause style={{ width: '18px', height: '18px' }} />
+                                    ) : (
+                                        <Play style={{ width: '18px', height: '18px' }} />
+                                    )}
+                                </button>
+                                
+                                <div style={{ 
+                                    fontFamily: 'monospace', 
+                                    fontSize: '14px', 
+                                    fontWeight: '600', 
+                                    color: 'white',
+                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+                                }}>
+                                    {formatTime(currentTime)} / {formatTime(duration)}
+                                </div>
+                                
+                                <div style={{ flex: 1 }}></div>
+                                
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <button
+                                        onClick={toggleMute}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: '5px',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        {isMuted || volume === 0 ? (
+                                            <VolumeX style={{ width: '20px', height: '20px', color: 'white' }} />
+                                        ) : (
+                                            <Volume2 style={{ width: '20px', height: '20px', color: 'white' }} />
+                                        )}
+                                    </button>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        value={isMuted ? 0 : volume}
+                                        onChange={handleVolumeChange}
+                                        className="volume-slider"
+                                    />
+                                </div>
+                                
+                                <button
+                                    onClick={toggleFullscreen}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '5px',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    }}
+                                >
+                                    <Maximize style={{ width: '20px', height: '20px', color: 'white' }} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
 
             // Cleanup timeout on unmount
             useEffect(() => {
