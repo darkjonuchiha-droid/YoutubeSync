@@ -427,7 +427,7 @@
                             controls: 0, // Hide YouTube controls
                             modestbranding: 1,
                             rel: 0,
-                            fs: 0, // Disable fullscreen button
+                            fs: 1, // Enable fullscreen button (we'll override it)
                             iv_load_policy: 3
                         },
                         events: {
@@ -558,11 +558,29 @@
             };
 
             const toggleFullscreen = () => {
-                const container = document.getElementById('player-container');
-                if (!document.fullscreenElement) {
-                    container.requestFullscreen();
-                } else {
-                    document.exitFullscreen();
+                // Use YouTube's native fullscreen API
+                if (playerInstanceRef.current && playerInstanceRef.current.getIframe) {
+                    const iframe = playerInstanceRef.current.getIframe();
+                    
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement) {
+                        // Enter fullscreen
+                        if (iframe.requestFullscreen) {
+                            iframe.requestFullscreen();
+                        } else if (iframe.webkitRequestFullscreen) {
+                            iframe.webkitRequestFullscreen();
+                        } else if (iframe.mozRequestFullScreen) {
+                            iframe.mozRequestFullScreen();
+                        }
+                    } else {
+                        // Exit fullscreen
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        } else if (document.mozCancelFullScreen) {
+                            document.mozCancelFullScreen();
+                        }
+                    }
                 }
             };
 
