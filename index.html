@@ -72,10 +72,16 @@
         #player-container:-webkit-full-screen #youtube-player,
         #player-container:-moz-full-screen #youtube-player {
             position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
             width: 100% !important;
             height: 100% !important;
+        }
+        #player-container:fullscreen #youtube-player iframe,
+        #player-container:-webkit-full-screen #youtube-player iframe,
+        #player-container:-moz-full-screen #youtube-player iframe {
+            object-fit: contain !important;
         }
         #player-container:fullscreen .controls-overlay,
         #player-container:-webkit-full-screen .controls-overlay,
