@@ -432,12 +432,15 @@
             useEffect(() => {
                 const handleFullscreenChange = () => {
                     const fsElement = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement;
+                    console.log('Fullscreen changed:', !!fsElement, fsElement);
                     setIsFullscreen(!!fsElement);
                     
                     if (fsElement) {
+                        console.log('Creating overlay...');
                         // Create overlay
                         setTimeout(() => createOverlay(fsElement), 100);
                     } else {
+                        console.log('Removing overlay...');
                         // Remove overlay
                         if (overlayRef.current) {
                             ReactDOM.unmountComponentAtNode(overlayRef.current);
@@ -459,15 +462,22 @@
             }, []);
 
             const createOverlay = (fsElement) => {
-                if (overlayRef.current) return;
+                console.log('createOverlay called with:', fsElement);
+                if (overlayRef.current) {
+                    console.log('Overlay already exists, skipping...');
+                    return;
+                }
                 
                 const overlay = document.createElement('div');
                 overlay.className = 'fs-overlay';
+                overlay.id = 'custom-fs-overlay';
                 fsElement.appendChild(overlay);
                 overlayRef.current = overlay;
+                console.log('Overlay element created and appended');
 
                 const root = ReactDOM.createRoot(overlay);
                 root.render(<FullscreenOverlay />);
+                console.log('Overlay React component rendered');
             };
 
             const FullscreenOverlay = () => {
@@ -809,11 +819,101 @@
                             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
                         }}>
                             {videoId ? (
-                                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
-                                    <div id="youtube-player" style={{
-                                        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'
-                                    }}></div>
-                                </div>
+                                <>
+                                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, background: '#000' }}>
+                                        <div id="youtube-player" style={{
+                                            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'
+                                        }}></div>
+                                    </div>
+                                    
+                                    {/* Normal Mode Controls */}
+                                    <div style={{
+                                        padding: '15px 20px',
+                                        background: 'rgba(0, 0, 0, 0.05)',
+                                        borderTop: '1px solid rgba(0, 0, 0, 0.1)'
+                                    }}>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={duration || 0}
+                                            value={currentTime}
+                                            onChange={handleSeek}
+                                            className="progress-bar"
+                                            style={{ width: '100%', marginBottom: '15px' }}
+                                        />
+                                        
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                                            <button
+                                                onClick={togglePlayback}
+                                                style={{
+                                                    background: '#667eea',
+                                                    color: 'white',
+                                                    padding: '10px',
+                                                    borderRadius: '50%',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    width: '40px',
+                                                    height: '40px'
+                                                }}
+                                            >
+                                                {isPlaying ? <Pause style={{ width: '18px', height: '18px' }} /> : <Play style={{ width: '18px', height: '18px' }} />}
+                                            </button>
+                                            
+                                            <div style={{ 
+                                                fontFamily: 'monospace', 
+                                                fontSize: '14px', 
+                                                fontWeight: '600', 
+                                                color: '#1a202c'
+                                            }}>
+                                                {formatTime(currentTime)} / {formatTime(duration)}
+                                            </div>
+                                            
+                                            <div style={{ flex: 1 }}></div>
+                                            
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <button
+                                                    onClick={toggleMute}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        padding: '5px',
+                                                        display: 'flex'
+                                                    }}
+                                                >
+                                                    {isMuted || volume === 0 ? 
+                                                        <VolumeX style={{ width: '20px', height: '20px', color: '#4a5568' }} /> : 
+                                                        <Volume2 style={{ width: '20px', height: '20px', color: '#4a5568' }} />
+                                                    }
+                                                </button>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={isMuted ? 0 : volume}
+                                                    onChange={handleVolumeChange}
+                                                    className="volume-slider"
+                                                />
+                                            </div>
+                                            
+                                            <button
+                                                onClick={toggleFullscreen}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    padding: '5px',
+                                                    display: 'flex'
+                                                }}
+                                            >
+                                                <Maximize style={{ width: '20px', height: '20px', color: '#4a5568' }} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
                             ) : (
                                 <div style={{
                                     position: 'relative', paddingBottom: '56.25%', height: 0,
